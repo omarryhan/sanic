@@ -1,8 +1,19 @@
 from os import environ
+from pathlib import Path
+from contextlib import contextmanager
+from tempfile import TemporaryDirectory
+from textwrap import dedent
 import pytest
-from tempfile import NamedTemporaryFile
 
 from sanic import Sanic
+from sanic.exceptions import PyFileError
+
+
+@contextmanager
+def temp_path():
+    """ a simple cross platform replacement for NamedTemporaryFile """
+    with TemporaryDirectory() as td:
+        yield Path(td, 'file')
 
 
 def test_load_from_object(app):
@@ -38,16 +49,15 @@ def test_load_env_prefix():
 
 
 def test_load_from_file(app):
-    config = b"""
-VALUE = 'some value'
-condition = 1 == 1
-if condition:
-    CONDITIONAL = 'should be set'
-    """
-    with NamedTemporaryFile() as config_file:
-        config_file.write(config)
-        config_file.seek(0)
-        app.config.from_pyfile(config_file.name)
+    config = dedent("""
+    VALUE = 'some value'
+    condition = 1 == 1
+    if condition:
+        CONDITIONAL = 'should be set'
+    """)
+    with temp_path() as config_path:
+        config_path.write_text(config)
+        app.config.from_pyfile(str(config_path))
         assert 'VALUE' in app.config
         assert app.config.VALUE == 'some value'
         assert 'CONDITIONAL' in app.config
@@ -61,11 +71,10 @@ def test_load_from_missing_file(app):
 
 
 def test_load_from_envvar(app):
-    config = b"VALUE = 'some value'"
-    with NamedTemporaryFile() as config_file:
-        config_file.write(config)
-        config_file.seek(0)
-        environ['APP_CONFIG'] = config_file.name
+    config = "VALUE = 'some value'"
+    with temp_path() as config_path:
+        config_path.write_text(config)
+        environ['APP_CONFIG'] = str(config_path)
         app.config.from_envvar('APP_CONFIG')
         assert 'VALUE' in app.config
         assert app.config.VALUE == 'some value'
@@ -79,6 +88,15 @@ def test_load_from_missing_envvar(app):
                                 "could not be loaded.")
 
 
+def test_load_config_from_file_invalid_syntax(app):
+    config = "VALUE = some value"
+    with temp_path() as config_path:
+        config_path.write_text(config)
+
+        with pytest.raises(PyFileError):
+            app.config.from_pyfile(config_path)
+
+
 def test_overwrite_exisiting_config(app):
     app.config.DEFAULT = 1
 
@@ -87,6 +105,16 @@ def test_overwrite_exisiting_config(app):
 
     app.config.from_object(Config)
     assert app.config.DEFAULT == 2
+
+
+def test_overwrite_exisiting_config_ignore_lowercase(app):
+    app.config.default = 1
+
+    class Config:
+        default = 2
+
+    app.config.from_object(Config)
+    assert app.config.default == 1
 
 
 def test_missing_config(app):

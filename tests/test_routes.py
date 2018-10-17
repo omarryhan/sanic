@@ -3,7 +3,7 @@ import pytest
 
 from sanic import Sanic
 from sanic.response import text, json
-from sanic.router import RouteExists, RouteDoesNotExist
+from sanic.router import RouteExists, RouteDoesNotExist, ParameterNameConflicts
 from sanic.constants import HTTP_METHODS
 
 
@@ -165,39 +165,41 @@ def test_route_optional_slash(app):
     request, response = app.test_client.get('/get/')
     assert response.text == 'OK'
 
+
 def test_route_strict_slashes_set_to_false_and_host_is_a_list(app):
-    #Part of regression test for issue #1120
+    # Part of regression test for issue #1120
 
-    site1 = 'localhost:{}'.format(app.test_client.port)
+    site1 = '127.0.0.1:{}'.format(app.test_client.port)
 
-    #before fix, this raises a RouteExists error
+    # before fix, this raises a RouteExists error
     @app.get('/get', host=[site1, 'site2.com'], strict_slashes=False)
-    def handler(request):
+    def get_handler(request):
         return text('OK')
 
     request, response = app.test_client.get('http://' + site1 + '/get')
     assert response.text == 'OK'
 
     @app.post('/post', host=[site1, 'site2.com'], strict_slashes=False)
-    def handler(request):
+    def post_handler(request):
         return text('OK')
 
-    request, response = app.test_client.post('http://' + site1 +'/post')
+    request, response = app.test_client.post('http://' + site1 + '/post')
     assert response.text == 'OK'
 
     @app.put('/put', host=[site1, 'site2.com'], strict_slashes=False)
-    def handler(request):
+    def put_handler(request):
         return text('OK')
 
-    request, response = app.test_client.put('http://' + site1 +'/put')
+    request, response = app.test_client.put('http://' + site1 + '/put')
     assert response.text == 'OK'
 
     @app.delete('/delete', host=[site1, 'site2.com'], strict_slashes=False)
-    def handler(request):
+    def delete_handler(request):
         return text('OK')
 
-    request, response = app.test_client.delete('http://' + site1 +'/delete')
+    request, response = app.test_client.delete('http://' + site1 + '/delete')
     assert response.text == 'OK'
+
 
 def test_shorthand_routes_post(app):
 
@@ -933,3 +935,10 @@ def test_uri_with_different_method_and_different_params(app):
     assert response.json == {
         'action': 'post'
     }
+
+
+def test_route_raise_ParameterNameConflicts(app):
+    with pytest.raises(ParameterNameConflicts):
+        @app.get('/api/v1/<user>/<user>/')
+        def handler(request, user):
+            return text('OK')

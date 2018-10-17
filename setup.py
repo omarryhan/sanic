@@ -21,7 +21,7 @@ def open_local(paths, mode='r', encoding='utf8'):
 
 with open_local(['sanic', '__init__.py'], encoding='latin1') as fp:
     try:
-        version = re.findall(r"^__version__ = '([^']+)'\r?$",
+        version = re.findall(r"^__version__ = \"([^']+)\"\r?$",
                              fp.read(), re.M)[0]
     except IndexError:
         raise RuntimeError('Unable to determine version.')
@@ -48,6 +48,7 @@ setup_kwargs = {
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ],
 }
 
