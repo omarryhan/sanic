@@ -1,6 +1,7 @@
 from json import JSONDecodeError
-from sanic.log import logger
+
 from sanic.exceptions import MethodNotSupported
+from sanic.log import logger
 from sanic.response import text
 
 
@@ -24,7 +25,7 @@ class SanicTestClient:
             )
 
         logger.info(url)
-        conn = aiohttp.TCPConnector(verify_ssl=False)
+        conn = aiohttp.TCPConnector(ssl=False)
         async with aiohttp.ClientSession(
             cookies=cookies, connector=conn
         ) as session:
@@ -33,7 +34,7 @@ class SanicTestClient:
             ) as response:
                 try:
                     response.text = await response.text()
-                except UnicodeDecodeError as e:
+                except UnicodeDecodeError:
                     response.text = None
 
                 try:

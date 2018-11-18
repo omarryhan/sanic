@@ -1,16 +1,30 @@
 import asyncio
 import os
 import traceback
+
 from functools import partial
 from inspect import isawaitable
 from multiprocessing import Process
-from signal import SIGTERM, SIGINT, SIG_IGN, signal as signal_func, Signals
-from socket import socket, SOL_SOCKET, SO_REUSEADDR
+from signal import SIG_IGN, SIGINT, SIGTERM, Signals
+from signal import signal as signal_func
+from socket import SO_REUSEADDR, SOL_SOCKET, socket
 from time import time
 
 from httptools import HttpRequestParser
 from httptools.parser.errors import HttpParserError
 from multidict import CIMultiDict
+
+from sanic.exceptions import (
+    InvalidUsage,
+    PayloadTooLarge,
+    RequestTimeout,
+    ServerError,
+    ServiceUnavailable,
+)
+from sanic.log import access_logger, logger
+from sanic.request import Request
+from sanic.response import HTTPResponse
+
 
 try:
     import uvloop
@@ -19,16 +33,6 @@ try:
 except ImportError:
     pass
 
-from sanic.log import logger, access_logger
-from sanic.response import HTTPResponse
-from sanic.request import Request
-from sanic.exceptions import (
-    RequestTimeout,
-    PayloadTooLarge,
-    InvalidUsage,
-    ServerError,
-    ServiceUnavailable,
-)
 
 current_time = None
 
@@ -296,7 +300,7 @@ class HttpProtocol(asyncio.Protocol):
                 self.request.stream.put(body)
             )
             return
-        self.request.body.append(body)
+        self.request.body_push(body)
 
     def on_message_complete(self):
         # Entire request (headers and whole body) is received.
@@ -309,7 +313,7 @@ class HttpProtocol(asyncio.Protocol):
                 self.request.stream.put(None)
             )
             return
-        self.request.body = b"".join(self.request.body)
+        self.request.body_finish()
         self.execute_request_handler()
 
     def execute_request_handler(self):
